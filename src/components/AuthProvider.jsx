@@ -12,68 +12,60 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // Check local storage for an existing session marker
-        const savedUser = localStorage.getItem('esp32_user');
-        if (savedUser) {
-            setSession(JSON.parse(savedUser));
-        }
-        setLoading(false);
+        // Fetch current session
+        const getSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setSession(session);
+            setLoading(false);
+        };
+        getSession();
+
+        // Listen for auth changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
     }, []);
 
     const signup = async (email, password) => {
-        // 1. Check if user exists
-        const { data: existing } = await supabase
-            .from('custom_users')
-            .select('id')
-            .eq('email', email)
-            .single();
-
-        if (existing) {
-            throw new Error("User already exists");
-        }
-
-        // 2. Insert new user
-        const { data, error } = await supabase
-            .from('custom_users')
-            .insert([{ email, password }]) // In a real app password should be hashed!
-            .select()
-            .single();
-
+        const { data, error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-
-        // 3. Save to local state
-        setSession(data);
-        localStorage.setItem('esp32_user', JSON.stringify(data));
         return data;
     };
 
     const login = async (email, password) => {
-        const { data, error } = await supabase
-            .from('custom_users')
-            .select('*')
-            .eq('email', email)
-            .eq('password', password)
-            .single();
-
-        if (error || !data) {
-            throw new Error("Invalid login credentials");
-        }
-
-        setSession(data);
-        localStorage.setItem('esp32_user', JSON.stringify(data));
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
         return data;
     };
 
-    const logout = () => {
-        setSession(null);
-        localStorage.removeItem('esp32_user');
+    const logout = async () => {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+    };
+
+    const resetPassword = async (email) => {
+        const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: window.location.origin + '/reset-password',
+        });
+        if (error) throw error;
+        return data;
+    };
+
+    const updatePassword = async (newPassword) => {
+        const { data, error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+        return data;
     };
 
     const value = {
         session,
         login,
         signup,
-        logout
+        logout,
+        resetPassword,
+        updatePassword
     };
 
     return (

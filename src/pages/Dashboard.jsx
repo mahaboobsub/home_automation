@@ -25,7 +25,7 @@ export default function Dashboard() {
             const { data, error } = await supabase
                 .from('devices_new')
                 .select('*')
-                .eq('user_id', session.id)
+                .eq('user_id', session.user.id)
                 .order('created_at', { ascending: false })
 
             if (error) throw error
@@ -46,7 +46,7 @@ export default function Dashboard() {
             const { data, error } = await supabase
                 .from('devices_new')
                 .insert([
-                    { user_id: session.id, ip_address: ipAddress.trim() }
+                    { user_id: session.user.id, ip_address: ipAddress.trim() }
                 ])
                 .select()
 
